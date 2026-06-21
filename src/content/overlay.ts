@@ -19,6 +19,16 @@ import tokensCss from "../lib/tokens.css";
 /** The light-DOM host element id (one per page; idempotent). */
 const HOST_ID = "myne-clip-overlay";
 
+/**
+ * Per-document handle to the overlay's CLOSED shadow root. A closed root is
+ * unreadable from outside `attachShadow`'s return value — including from a later
+ * content-script injection's fresh module instance — so we cannot rediscover it
+ * via `element.shadowRoot` (that is `null` for a closed root). We therefore track
+ * it ourselves for the within-instance idempotent reuse; a host left by a PRIOR
+ * injection (whose root this module can never reach) is removed and recreated.
+ */
+const overlayRoots = new WeakMap<Document, ShadowRoot>();
+
 /** Structural layout for the overlay wrapper + the bottom-right surface anchor.
  *  Loaded AFTER the token CSS so its explicit `position` overrides the
  *  `.myne-overlay { all: initial }` reset for the wrapper's own box. */
@@ -58,18 +68,23 @@ function injectStyleInto(root: ShadowRoot, id: string, css: string): void {
  * and the prompt share one shadow root and the token CSS is injected once.
  */
 export function ensureOverlay(doc: Document = document): OverlayHandle {
-  const existing = doc.getElementById(HOST_ID);
-  if (existing && existing.shadowRoot) {
-    const root = existing.shadowRoot;
-    const anchor = root.querySelector<HTMLElement>(".myne-overlay__anchor");
+  // Reuse the overlay THIS module instance created (its closed shadow root is
+  // unreachable via `element.shadowRoot`, so we read it from our own map).
+  const cached = overlayRoots.get(doc);
+  if (cached) {
+    const anchor = cached.querySelector<HTMLElement>(".myne-overlay__anchor");
     if (anchor) {
       return {
         anchor,
-        root,
-        injectStyle: (id, css) => injectStyleInto(root, id, css),
+        root: cached,
+        injectStyle: (id, css) => injectStyleInto(cached, id, css),
       };
     }
   }
+  // A host element from a PRIOR content-script injection carries a closed shadow
+  // root this module can never reach — remove it so we don't stack duplicates,
+  // then create a fresh closed host owned by this instance.
+  doc.getElementById(HOST_ID)?.remove();
 
   const host = doc.createElement("div");
   host.id = HOST_ID;
@@ -78,7 +93,11 @@ export function ensureOverlay(doc: Document = document): OverlayHandle {
   host.style.cssText =
     "position:fixed;inset:0;margin:0;padding:0;border:0;z-index:2147483647;pointer-events:none;";
 
-  const root = host.attachShadow({ mode: "open" });
+  // CLOSED shadow root: the strongest wall the architecture intends — the host
+  // page's scripts cannot read or tamper with our surface via `host.shadowRoot`
+  // (it is `null` for them), only restyle is already severed by `all: initial`.
+  const root = host.attachShadow({ mode: "closed" });
+  overlayRoots.set(doc, root);
   injectStyleInto(root, "tokens", tokensCss);
   injectStyleInto(root, "overlay-base", OVERLAY_BASE_CSS);
 

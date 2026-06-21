@@ -34,6 +34,19 @@ import {
  * discipline as `clip.ts`'s `sendEnvelopeToHost`. A locked / error phase-1 reply
  * resolves immediately (no phase 2); `onChallenge` fires only on a real challenge.
  */
+/**
+ * How long the whole two-phase handshake may take before it is abandoned (X2).
+ *
+ * Phase 2 (`pair-await`) deliberately BLOCKS the desktop until the user clicks
+ * Accept / Reject, so this must be a generous HUMAN-scale budget — but it must
+ * be FINITE: if the desktop silently ignores the frame (a stale/parse-failed
+ * phase-1 reply, or the host stalls) it sends neither a terminal reply nor a
+ * disconnect, so an unbounded handshake would leave the in-flight pairing banner
+ * up forever. On timeout the handshake resolves `unreachable` (re-pair), never a
+ * fake pairing.
+ */
+const PAIR_REPLY_TIMEOUT_MS = 120_000;
+
 export function defaultSendPairRequest(
   onChallenge: (code: string) => void,
 ): Promise<PairResult> {
@@ -49,12 +62,14 @@ export function defaultSendPairRequest(
     }
 
     let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     // `false` while awaiting the phase-1 (begin) reply; `true` once we have sent
     // phase 2 (await) and are waiting for the terminal token/outcome reply.
     let awaiting = false;
     const settle = (result: PairResult): void => {
       if (settled) return;
       settled = true;
+      if (timer !== undefined) clearTimeout(timer);
       try {
         port.disconnect();
       } catch {
@@ -88,6 +103,10 @@ export function defaultSendPairRequest(
     // A disconnect BEFORE the terminal reply means the host was unreachable /
     // crashed / the app is closed — honest unreachable, never a fake pairing.
     port.onDisconnect.addListener(() => settle({ status: "unreachable" }));
+    // Bound the whole handshake: a silently-ignored frame yields neither a
+    // terminal reply nor a disconnect, so without this the in-flight pairing
+    // would hang forever. Generous (human-scale) but finite.
+    timer = setTimeout(() => settle({ status: "unreachable" }), PAIR_REPLY_TIMEOUT_MS);
 
     port.postMessage(buildPairBeginEnvelope(browser.runtime.id));
   });

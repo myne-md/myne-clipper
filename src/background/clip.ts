@@ -104,6 +104,33 @@ async function captureActiveTab(): Promise<CapturedClip | null> {
   return isCapturedClip(clip) ? clip : null;
 }
 
+/**
+ * How long to wait for the host's clip reply before treating the desktop as not
+ * reachable (X2). It must EXCEED the app's clip-dispatch budget — the desktop
+ * parks up to ~30 s assembling a clip (resolving `[[wikilinks]]` against a large
+ * decrypted vault) and then ALWAYS replies — so a legitimate clip is never cut
+ * off. The margin bounds the silent path: a revoked / invalid token is SILENTLY
+ * IGNORED by the desktop (no reply AND no disconnect — `relay.rs`'s
+ * `serve_connection` keeps the connection open), so without a bound the clip
+ * Promise hangs forever and the toolbar icon is stranded in "clipping". Mirrors
+ * `status.ts`'s `STATUS_QUERY_TIMEOUT_MS` (a status read is quick → 2 s; a clip
+ * can be slow → this larger budget).
+ */
+const CLIP_REPLY_TIMEOUT_MS = 35_000;
+
+/**
+ * The largest serialized envelope the extension will hand to the host (X1).
+ * Chrome / Edge cap a SINGLE extension→host native message at 1 MiB; a larger
+ * message is dropped by the browser runtime (the port errors / disconnects with
+ * NO reply), which would otherwise surface as a misleading "open Myne" while
+ * Myne is open and unlocked. We measure the serialized envelope up-front and
+ * fail with an honest `clip_too_large` instead. The cap sits under 1 MiB to
+ * leave headroom for the runtime's JSON + 4-byte-length framing overhead. (Note:
+ * `image_bytes` is currently a JSON number-array — ~4–7× inflation — so this cap
+ * also bounds that until the wire encoding moves to base64.)
+ */
+const MAX_EXT_TO_HOST_BYTES = 1_000_000;
+
 // Send one envelope to the desktop host over native messaging and resolve with
 // an HONEST outcome. The four cases task 8 must keep distinct:
 //   - `unreachable` — `connectNative` threw, OR the port disconnected before any
@@ -120,6 +147,21 @@ export function sendEnvelopeToHost(
   captureKind: CaptureKind,
 ): Promise<ClipOutcome> {
   return new Promise<ClipOutcome>((resolve) => {
+    // Size guard (X1): a >1 MiB ext→host message is dropped by Chrome/Edge with
+    // no reply — measure the serialized envelope up-front and fail honestly,
+    // never spawning the host for a clip that can't traverse the wire.
+    let serialized: string;
+    try {
+      serialized = JSON.stringify(envelope);
+    } catch {
+      resolve({ status: "error", reason: "malformed_envelope" });
+      return;
+    }
+    if (new TextEncoder().encode(serialized).length > MAX_EXT_TO_HOST_BYTES) {
+      resolve({ status: "error", reason: "clip_too_large" });
+      return;
+    }
+
     // Open the native-messaging port first so its type is inferred (the
     // ambient polyfill default import exposes no `Runtime.Port` type name).
     let port: ReturnType<typeof browser.runtime.connectNative>;
@@ -131,9 +173,11 @@ export function sendEnvelopeToHost(
     }
 
     let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const settle = (outcome: ClipOutcome): void => {
       if (settled) return;
       settled = true;
+      if (timer !== undefined) clearTimeout(timer);
       try {
         port.disconnect();
       } catch {
@@ -163,6 +207,9 @@ export function sendEnvelopeToHost(
     // the app is closed — surface the honest unreachable state, never a fake
     // success (SYNC-13, task 8).
     port.onDisconnect.addListener(() => settle({ status: "unreachable" }));
+    // A silently-ignored (revoked / invalid / unpaired) frame yields neither a
+    // reply nor a disconnect — bound the wait so a clip can never hang the icon.
+    timer = setTimeout(() => settle({ status: "unreachable" }), CLIP_REPLY_TIMEOUT_MS);
 
     port.postMessage(envelope);
   });

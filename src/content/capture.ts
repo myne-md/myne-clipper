@@ -67,14 +67,41 @@ const INLINE_TAGS = new Set([
   "br", "img", "wbr", "bdi", "bdo",
 ]);
 
+// Link schemes safe to emit into the clip body. A resolved URL with ANY other
+// scheme (`javascript:` / `data:` / `vbscript:` / `file:` / `blob:` …) is
+// dropped so the extension is never a willing markdown-injection vector into the
+// note the desktop renders — defense-in-depth atop the desktop's DOMPurify
+// allow-list and the desktop-side envelope validation. Relative / anchor links
+// resolve against the page's http(s) base, so they pass.
+const SAFE_LINK_SCHEMES = new Set(["http:", "https:", "mailto:"]);
+
 // Resolve a possibly-relative href against the page so the clip's links work
-// from inside the vault (where there is no page base). Falls back to the raw
-// href on a parse failure (never throws into the capture).
+// from inside the vault (where there is no page base). Returns "" for a parse
+// failure OR a disallowed scheme, so the caller degrades the link to plain text
+// rather than emitting an unsafe / unusable target.
 function absoluteUrl(href: string): string {
+  let resolved: URL;
   try {
-    return new URL(href, document.baseURI).href;
+    resolved = new URL(href, document.baseURI);
   } catch {
-    return href;
+    return "";
+  }
+  return SAFE_LINK_SCHEMES.has(resolved.protocol) ? resolved.href : "";
+}
+
+// The provenance source URL — but ONLY when the page is http(s). A `file://` /
+// `data:` / `chrome://` location is NOT handed across TB10 as provenance (no
+// local-path / inline-blob leak); an empty result means "no provenance" and the
+// desktop omits the `source:` / `url:` frontmatter. The desktop re-validates
+// this with the same allow-list (`validateClipEnvelope`), so this is the
+// cooperating producer half: a benign non-http(s) page clips WITHOUT provenance
+// instead of being rejected outright.
+function safeSourceUrl(): string {
+  try {
+    const u = new URL(document.location.href);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : "";
+  } catch {
+    return "";
   }
 }
 
@@ -285,13 +312,15 @@ export function captureClip(): CapturedClip {
 
   const contentBody =
     scope === "selection" && sel ? captureSelection(sel) : captureArticle();
-  const heading = title.length > 0 ? "# " + title : "";
+  // Escape the page-controlled title's leading block marker like body paragraphs
+  // do (consistent markdown safety — the title is hostile page input too).
+  const heading = title.length > 0 ? "# " + escapeLineStart(title) : "";
   const markdownBody = [heading, contentBody].filter((s) => s.length > 0).join("\n\n");
 
   return {
     captureKind: scope,
     markdownBody,
-    sourceUrl: document.location.href,
+    sourceUrl: safeSourceUrl(),
     clipDate: new Date().toISOString(),
   };
 }

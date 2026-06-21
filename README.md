@@ -23,7 +23,7 @@ pnpm typecheck    # tsc --noEmit
 
 A **single `manifest.json`** carries **both** background keys: `background.service_worker` (Chromium MV3 reads it, Firefox ignores it) and `background.scripts` (Firefox MV3 event page reads it, Chromium ignores it), both pointing at the same bundled `background.js`. No per-target manifest is generated. The background is bundled as a **classic IIFE script** (not an ES module) so the one bundle loads identically as a Chromium service worker and a Firefox event-page script. [`webextension-polyfill`](https://github.com/mozilla/webextension-polyfill) reconciles `chrome.*` (callback) vs `browser.*` (promise) at the API level, so a **single source** compiles for all three targets (SYNC-4).
 
-Permissions are deliberately minimal: `nativeMessaging` (the desktop clip channel, TB10), plus `activeTab` + `scripting` for the eventual **user-gesture** in-page capture. There is **no `<all_urls>` host permission and no auto-injected `content_scripts`** — a broad host match would trigger the "read all your data on every site" install warning and a slow store review, and it is not needed when capture runs on a click via `activeTab`.
+Permissions are deliberately minimal: `nativeMessaging` (the desktop clip channel, TB10), `activeTab` + `scripting` for the **user-gesture** in-page capture, `storage` for the scoped pairing token only (never a clip buffer — SYNC-1a), and `contextMenus` for the right-click clip / bookmark / pair entries. There is **no `<all_urls>` host permission and no auto-injected `content_scripts`** — a broad host match would trigger the "read all your data on every site" install warning and a slow store review, and it is not needed when capture runs on a click via `activeTab`.
 
 ### Safari is out of v1 scope
 
@@ -31,4 +31,4 @@ Safari is **not** a v1 target. Safari Web Extensions cannot use the `nativeMessa
 
 ## Status
 
-The current state is the **MV3 foundation scaffold** (sub-feature 1 + 2): the loadable manifest, the single cross-browser background entry, the toolbar action, and a **stub** popup with placeholder pairing / locked / closed states. The toolbar click and popup do **no real work yet** — they load cleanly under all three runtimes. The native-messaging host wiring, pairing handshake, real clip behaviour, and final popup UX land in subsequent sub-features.
+The extension is **functionally complete** across the v1 sub-features: the loadable cross-browser manifest + background, the native-messaging clip handoff, the two-phase pairing handshake, the `is-unlocked-status` pre-check, durable scoped-token storage, the in-page DOM→markdown capture, the bookmark path, and the toolbar / context-menu / command triggers with the toast + prompt content UI. (Earlier revisions of this README described a "foundation scaffold" with a stub popup — that is no longer accurate.)
