@@ -1,0 +1,112 @@
+/* =========================================================================
+   Myne extension — design-token CONTRACT COPY for the injected capture overlay
+   (clip-time-ux, sub-feature 4).
+
+   This is a CONTRACT COPY, NOT AN IMPORT. The values below are re-declared from
+   the main repo's published token source (`docs/design/colors_and_type.css`)
+   for the subset this feature needs. The extension is keyless and does not link
+   `protocol/` or import the desktop `src/`/`docs/design/` tree (SYNC-5) — when
+   the published token contract is retuned, this projection is updated by hand,
+   never wired across repos.
+
+   SCOPING — the central rule for a HOSTILE host page:
+   These tokens are declared on the overlay container class `.myne-overlay`, NOT
+   on `:root`/`html`, so they cannot leak OUT onto the page the extension is
+   injected into. And `.myne-overlay` opens with `all: initial`, a hard reset
+   that severs inheritance so the host page's cascade cannot bleed IN (a page's
+   `* { color: red }` or aggressive `font-family` can't reach the toast/prompt).
+   In practice this CSS is loaded inside a Shadow DOM root (the content-script
+   overlay; built in clip-time-ux task 6/7) which is the strongest isolation —
+   `all: initial` + the scoped vars are the belt-and-suspenders second wall so
+   the surface still renders correctly even if a future surface mounts it light.
+
+   Light is the default. Dark applies via `prefers-color-scheme: dark` AND via an
+   explicit `[data-theme="dark"]` override on (or above) the overlay container,
+   mirroring the desktop's theme-application discipline.
+   ========================================================================= */
+
+/* The overlay container: a hard reset so the host page cannot inherit in, then
+   the token surface + this feature's base type. The token declarations live
+   here (scoped) — never on :root — so nothing leaks onto the host page. */
+.myne-overlay {
+  /* Sever host-page inheritance: the surface starts from a clean slate. */
+  all: initial;
+
+  /* -- Type family ----------------------------------------------------- */
+  /* Inter is not bundled in the extension (no CDN, no host fonts trusted);
+     the contract's system fallbacks carry the surface. */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+
+  /* -- Type scale ------------------------------------------------------ */
+  --text-sm: 13px;
+
+  /* -- Neutral / surface (light defaults) ------------------------------ */
+  --bg-2: #f4f4f2; /* recessed surface — the toast/prompt panel */
+  --line-1: #e3e2dd; /* hairline border */
+
+  /* -- Accent ---------------------------------------------------------- */
+  --accent: #2c4a7a; /* iron-blue — the inline "view" action */
+
+  /* -- State ----------------------------------------------------------- */
+  --success: #2f6048; /* the saved-chip / circle-check tint */
+  --danger: #b54034; /* the error-toast / circle-alert tint */
+
+  /* -- Elevation ------------------------------------------------------- */
+  --shadow-2: 0 2px 4px rgba(11, 11, 9, 0.06), 0 4px 12px rgba(11, 11, 9, 0.08);
+
+  /* -- Radii ----------------------------------------------------------- */
+  --radius-2: 6px;
+
+  /* -- Motion ---------------------------------------------------------- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-base: 180ms;
+
+  /* Re-establish the base typography the reset cleared, from the tokens. */
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  /* Default ink color so child text is legible without inheriting from host. */
+  color: #1a1a17; /* --ink-1 (light) */
+}
+
+/* Dark — explicit override: a `data-theme="dark"` on the overlay (or any
+   ancestor inside the shadow root) flips the token VALUES. Matches the desktop
+   contract's `:root[data-theme="dark"]` block. */
+.myne-overlay[data-theme="dark"],
+[data-theme="dark"] .myne-overlay {
+  --bg-2: #1a1a17; /* --_paper-2-dark */
+  --line-1: #2c2b28; /* --_line-1-dark */
+  --accent: #8aa4d0; /* --_accent-dark */
+  --success: #8cc1a4; /* --_success-dark */
+  --danger: #d98b80; /* --_danger-dark */
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.5);
+  color: #e8e7df; /* --_ink-1-dark */
+}
+
+/* Dark — System mode: follow the OS live when no explicit light/dark override
+   is set, mirroring the desktop's `prefers-color-scheme` block. An explicit
+   `[data-theme="light"]` opts out (it matches neither selector). */
+@media (prefers-color-scheme: dark) {
+  .myne-overlay:not([data-theme="light"]):not([data-theme="dark"]) {
+    --bg-2: #1a1a17; /* --_paper-2-dark */
+    --line-1: #2c2b28; /* --_line-1-dark */
+    --accent: #8aa4d0; /* --_accent-dark */
+    --success: #8cc1a4; /* --_success-dark */
+    --danger: #d98b80; /* --_danger-dark */
+    --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.5);
+    color: #e8e7df; /* --_ink-1-dark */
+  }
+}
+
+/* Reduced-motion: the surfaces that animate (toast slide/crossfade, the
+   clipping glyph) collapse their motion. Declared once here so every overlay
+   surface inherits the honored preference (PRODUCT.md accessibility). */
+@media (prefers-reduced-motion: reduce) {
+  .myne-overlay,
+  .myne-overlay * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

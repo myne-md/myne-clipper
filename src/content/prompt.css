@@ -1,0 +1,120 @@
+/* =========================================================================
+   Locked / closed / unpaired prompt (clip-time-ux task 5).
+
+   Same Shadow DOM host + token contract as the toast (`./overlay.ts`,
+   `../lib/tokens.css`). The whole panel is the click target that opens/
+   foregrounds the desktop (task 7), so the main affordance is a full-width
+   `button`; a quiet `x` dismiss sits in the corner. Leading `circle-alert`
+   glyph. No structure, no "saved/queued" affordance — the prompt holds nothing.
+   Motion collapses under `prefers-reduced-motion` (global, tokens.css).
+   ========================================================================= */
+
+.myne-prompt {
+  pointer-events: auto;
+  position: relative;
+  box-sizing: border-box;
+  max-width: 360px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  animation: myne-toast-in var(--duration-base) var(--ease-standard);
+}
+
+.myne-prompt[data-leaving="true"] {
+  animation: myne-toast-out var(--duration-base) var(--ease-standard) forwards;
+}
+
+/* The whole-surface activate button (the click target → open/foreground). */
+.myne-prompt__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  background: none;
+  border: none;
+  border-radius: var(--radius-2);
+  margin: 0;
+  /* Extra right padding clears the absolute corner dismiss (`x` at right:6px,
+     ~18px wide) so a long message line ("Myne is locked — click to unlock")
+     never runs underneath it. The panel still sizes to content under its 360px
+     cap, so the line stays unwrapped. */
+  padding: 12px 32px 12px 14px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.myne-prompt__main:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.myne-prompt__main:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Leading `circle-alert` — tinted by state. Locked / closed are "not ready"
+   attention states, so the glyph carries the `--danger` alert tint (matching the
+   toolbar's locked ink); the gentler first-run `unpaired` nudge keeps the
+   `--accent` hint. The glyph SHAPE + the message still carry the meaning — color
+   is the redundant cue, never the sole differentiator (PRODUCT.md a11y). */
+.myne-prompt__glyph {
+  display: inline-flex;
+  flex: none;
+  color: var(--accent);
+}
+.myne-prompt[data-kind="locked"] .myne-prompt__glyph,
+.myne-prompt[data-kind="closed"] .myne-prompt__glyph {
+  color: var(--danger);
+}
+.myne-prompt__glyph svg {
+  width: 18px;
+  height: 18px;
+}
+
+.myne-prompt__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.myne-prompt__message {
+  font-weight: 500;
+}
+/* The action verb, rendered as an `--accent` affordance hint. */
+.myne-prompt__action {
+  color: var(--accent);
+}
+
+/* Quiet corner dismiss — retains no state when clicked (task 7 / story 17). */
+.myne-prompt__dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 2px;
+  margin: 0;
+  color: inherit;
+  opacity: 0.5;
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+}
+.myne-prompt__dismiss:hover {
+  opacity: 1;
+}
+.myne-prompt__dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  opacity: 1;
+}
+.myne-prompt__dismiss svg {
+  width: 14px;
+  height: 14px;
+}

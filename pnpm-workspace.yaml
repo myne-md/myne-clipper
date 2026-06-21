@@ -1,0 +1,11 @@
+# Marks myne-clipper as its OWN pnpm workspace root.
+#
+# This repo is cloned as a nested directory inside the main `myne` repo, whose
+# root also carries a pnpm-workspace.yaml. Without this file, pnpm walks up the
+# directory tree, finds the parent workspace, and treats this repo as part of
+# the desktop's install — cross-contaminating the two separate supply chains
+# (SYNC-5). This empty-package workspace file stops that walk: myne-clipper
+# resolves against its OWN pnpm-lock.yaml, isolated from the main repo.
+packages: []
+allowBuilds:
+  esbuild: false

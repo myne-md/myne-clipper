@@ -1,0 +1,137 @@
+/* =========================================================================
+   Clip-success toast (clip-time-ux task 4).
+
+   Mounts inside the `.myne-overlay` Shadow DOM host (see `./overlay.ts`) and
+   consumes the token contract from `../lib/tokens.css` — `--bg-2` surface,
+   `--line-1` hairline, `--shadow-2` elevation, `--radius-2` corner, `--accent`
+   inline action, `--success` saved chip, `--font-sans`/`--text-sm` type. Enter/
+   exit motion is a restrained slide + crossfade (no bounce) that collapses to an
+   instant cut under `prefers-reduced-motion` (handled globally in tokens.css).
+   ========================================================================= */
+
+.myne-toast {
+  pointer-events: auto; /* the host is click-through; the panel is interactive */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  max-width: 360px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  animation: myne-toast-in var(--duration-base) var(--ease-standard);
+}
+
+/* The exit state the controller sets just before removal (task 6). Under
+   reduced motion the controller removes immediately instead of waiting. */
+.myne-toast[data-leaving="true"] {
+  animation: myne-toast-out var(--duration-base) var(--ease-standard) forwards;
+}
+
+/* Leading chip — `circle-check`/`--success` (success) or `circle-alert`/
+   `--danger` (error). The chip SHAPE + the message carry the meaning; the tint is
+   a redundant cue, never color alone. */
+.myne-toast__chip {
+  display: inline-flex;
+  flex: none;
+  color: var(--success);
+}
+.myne-toast[data-tone="error"] .myne-toast__chip {
+  color: var(--danger);
+}
+/* In-flight progress: a neutral `--accent` spinner. The rotation collapses to a
+   static glyph under `prefers-reduced-motion` (the global reduce block in
+   tokens.css zeroes the animation duration). */
+.myne-toast[data-tone="progress"] .myne-toast__chip {
+  color: var(--accent);
+}
+.myne-toast[data-tone="progress"] .myne-toast__chip svg {
+  animation: myne-toast-spin 0.8s linear infinite;
+}
+@keyframes myne-toast-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.myne-toast__chip svg {
+  width: 16px;
+  height: 16px;
+}
+
+.myne-toast__message {
+  flex: 1 1 auto;
+}
+
+/* Inline "view" action — `--accent` text button (clip variant only). */
+.myne-toast__view {
+  flex: none;
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  margin: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.myne-toast__view:hover {
+  text-decoration: underline;
+}
+.myne-toast__view:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Manual-dismiss control — a quiet `x`, always present (task 6 / story 22). */
+.myne-toast__dismiss {
+  flex: none;
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 2px;
+  margin: 0;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+}
+.myne-toast__dismiss:hover {
+  opacity: 1;
+}
+.myne-toast__dismiss:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  opacity: 1;
+}
+.myne-toast__dismiss svg {
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes myne-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes myne-toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
