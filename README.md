@@ -86,4 +86,4 @@ pnpm test         # vitest run
 
 ## License
 
-Application code in this repo is **AGPL-3.0** (declared in `package.json`), matching the Myne project's license for client code. The project's specs in the main repo's `docs/` keep a permissive content license (CC0) so the protocol stays reusable for independent implementations.
+Application code in this repo is **AGPL-3.0** (declared in `package.json`), matching the Myne project's license for client code. The project's specs in the main repo's `docs/` keep a permissive content license (CC-BY-4.0) so the protocol stays reusable for independent implementations.
