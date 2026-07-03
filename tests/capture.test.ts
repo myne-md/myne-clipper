@@ -98,3 +98,63 @@ describe("capture walker — title + provenance", () => {
     expect(clip.captureKind).toBe("full-article");
   });
 });
+
+describe("capture walker — hostile-DOM depth guard (finding İ1)", () => {
+  // Build a scripted-deep single-chain tree. createElement/appendChild bypasses
+  // the HTML parser's own nesting cap — exactly how a hostile page would build an
+  // arbitrarily deep DOM to blow the recursive walker's JS call stack.
+  function deepChain(tag: string, depth: number, leaf: string): HTMLElement {
+    const root = document.createElement(tag);
+    let cur: HTMLElement = root;
+    for (let i = 0; i < depth; i++) {
+      const child = document.createElement(tag);
+      cur.appendChild(child);
+      cur = child;
+    }
+    cur.textContent = leaf;
+    return root;
+  }
+  function mountArticle(node: HTMLElement): void {
+    document.body.innerHTML = "";
+    const article = document.createElement("article");
+    article.appendChild(node);
+    document.body.appendChild(article);
+  }
+
+  // NOTE on depth: jsdom's OWN tree attach/detach (`_attach`/`_detach`) is
+  // recursive, so it overflows its own stack building/tearing down a multi-
+  // -thousand-deep tree — well before it would exercise our walker. We therefore
+  // test just past MAX_WALK_DEPTH (512): deep enough that the guard MUST trip (and
+  // the pre-guard walker would keep recursing), shallow enough for jsdom to
+  // build. The 512 ceiling is what protects the real (native, non-recursive-DOM)
+  // browser from an arbitrarily deep hostile page.
+  it("degrades a just-over-limit block tree to its leaf text (guard path)", () => {
+    // 520 > MAX_WALK_DEPTH (512): the guard trips and flattens the deep subtree to
+    // its textContent, preserving the leaf text without recursing further.
+    mountArticle(deepChain("div", 520, "leaf text"));
+    const clip = captureClip();
+    expect(clip.markdownBody).toContain("leaf text");
+  });
+
+  it("never throws on a block tree past the depth ceiling", () => {
+    mountArticle(deepChain("div", 900, "deep leaf"));
+    let clip: ReturnType<typeof captureClip> | undefined;
+    expect(() => {
+      clip = captureClip();
+    }).not.toThrow();
+    expect(typeof clip!.markdownBody).toBe("string");
+    expect(clip!.markdownBody).toContain("deep leaf");
+  });
+
+  it("never throws on an inline tree past the depth ceiling", () => {
+    const p = document.createElement("p");
+    p.appendChild(deepChain("span", 900, "deep inline"));
+    mountArticle(p);
+    let clip: ReturnType<typeof captureClip> | undefined;
+    expect(() => {
+      clip = captureClip();
+    }).not.toThrow();
+    expect(typeof clip!.markdownBody).toBe("string");
+    expect(clip!.markdownBody).toContain("deep inline");
+  });
+});

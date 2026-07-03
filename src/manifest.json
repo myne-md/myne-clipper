@@ -38,6 +38,9 @@
     "contextMenus",
     "storage"
   ],
+  "content_security_policy": {
+    "extension_pages": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'"
+  },
   "browser_specific_settings": {
     "gecko": {
       "id": "clipper@myne.md",

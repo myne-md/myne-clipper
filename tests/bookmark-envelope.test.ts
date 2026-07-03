@@ -197,3 +197,26 @@ describe("the bookmark envelope is a DEGENERATE CLIP — byte-shape-identical to
     expect("status" in bookmark).toBe(false);
   });
 });
+
+describe("buildBookmarkEnvelope — the page title is markdown-escaped (first-line guard)", () => {
+  it("escapes a title whose leading char would forge markdown structure", () => {
+    const env = buildBookmarkEnvelope({
+      extensionId: EXTENSION_ID,
+      token: TOKEN,
+      payload: { ...bookmarkPayload(), title: "# Sneaky heading" },
+    });
+    // The intentional "# " H1 marker stays; the TITLE's own leading "#" is escaped
+    // so a page-controlled title cannot inject a second heading into the note. This
+    // matches the content-clip path (`content/capture` escapes its title too).
+    expect(env.markdown_body.startsWith("# \\# Sneaky heading")).toBe(true);
+  });
+
+  it("leaves a normal title unescaped (existing byte-shape fixtures unaffected)", () => {
+    const env = buildBookmarkEnvelope({
+      extensionId: EXTENSION_ID,
+      token: TOKEN,
+      payload: bookmarkPayload(), // title "An Example Article" — no leading marker
+    });
+    expect(env.markdown_body.startsWith("# An Example Article")).toBe(true);
+  });
+});

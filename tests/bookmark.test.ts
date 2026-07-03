@@ -176,3 +176,36 @@ describe("bookmarkActiveTab — no popup / picker, no spurious dispatch", () => 
     expect(bridge.dispatched[0].title).toBe("");
   });
 });
+
+describe("bookmarkActiveTab — non-http(s) tab is not bookmarkable (first-line URL gate)", () => {
+  // The URL is the load-bearing field of a bookmark; a non-http(s) tab must not
+  // be emitted verbatim into the note. This mirrors the content-clip path's
+  // `safeSourceUrl` gate — both share `safeHttpUrl`. A non-http(s) page is
+  // honestly un-bookmarkable (no local-path / inline-blob leak across TB10).
+  it.each([
+    "file:///Users/me/secret.pdf",
+    "data:text/html,<h1>x</h1>",
+    "about:blank",
+    "chrome://extensions",
+    "blob:https://example.com/uuid",
+    "javascript:alert(1)",
+  ])("rejects %s with an honest error and dispatches nothing", async (url) => {
+    const bridge = fakeBridge();
+    const outcome = await bookmarkActiveTab({
+      getActiveTab: fakeTabAccessor({ url, title: "T" }),
+      bridge,
+    });
+    expect(bridge.dispatched).toHaveLength(0);
+    expect(outcome.status).toBe("error");
+  });
+
+  it("dispatches an http(s) tab with the normalized URL", async () => {
+    const bridge = fakeBridge();
+    await bookmarkActiveTab({
+      getActiveTab: fakeTabAccessor({ url: "https://example.com/ok", title: "T" }),
+      bridge,
+    });
+    expect(bridge.dispatched).toHaveLength(1);
+    expect(bridge.dispatched[0].sourceUrl).toBe("https://example.com/ok");
+  });
+});

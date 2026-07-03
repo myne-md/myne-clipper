@@ -15,6 +15,8 @@
 // body. This mirrors the Rust source of truth `src-tauri/src/clipper/envelope.rs`
 // (the `HandoffEnvelope` struct), which has NO `page_title` field — the title
 // folds into `markdown_body`.
+import { escapeLineStart } from "../lib/markdown-safe";
+
 import type { CaptureKind } from "./clip";
 
 /**
@@ -108,7 +110,12 @@ export interface BookmarkEnvelopeInput {
  * degenerate clip carries across the wire.
  */
 function bookmarkBody(input: BookmarkEnvelopeInput): string {
-  const heading = input.title.length > 0 ? "# " + input.title : "";
+  // Escape the page-controlled title's leading block marker exactly like the
+  // content-clip path (`content/capture` escapes its title too) so a bookmark of
+  // a page whose title starts with `#`/`>`/`-`/… cannot inject markdown structure
+  // into the note. The source URL is already http(s)-gated upstream
+  // (`background/bookmark`), so it is a safe bare autolink here.
+  const heading = input.title.length > 0 ? "# " + escapeLineStart(input.title) : "";
   return [heading, input.sourceUrl].filter((s) => s.length > 0).join("\n\n");
 }
 

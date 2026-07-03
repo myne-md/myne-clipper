@@ -20,6 +20,8 @@
 // originates from this in-page capture) and NEVER reads or transmits any vault
 // structure (folders/tags) — there is none in the browser (SYNC-15).
 
+import { escapeLineStart, safeHttpUrl } from "../lib/markdown-safe";
+
 import { chooseCaptureScope } from "./capture-scope";
 
 /** How a clip was captured (mirrors the host `CaptureKind`, kebab-case). */
@@ -40,14 +42,6 @@ export interface CapturedClip {
 // the ends — the minimal normalization a functional emit needs.
 function normalizeInline(text: string): string {
   return text.replace(/\s+/g, " ").trim();
-}
-
-// Escape the few markdown-significant characters at the START of a line so a
-// captured paragraph that happens to begin with `#`/`-`/`>` etc. does not
-// accidentally become a heading/list/quote. Conservative — the faithful
-// serializer (sub-feature 2) does this properly.
-function escapeLineStart(line: string): string {
-  return line.replace(/^([#>\-*+]|\d+\.)/, "\\$1");
 }
 
 // Subtrees that are page CHROME, never article content — skipped entirely (the
@@ -95,25 +89,34 @@ function absoluteUrl(href: string): string {
 // desktop omits the `source:` / `url:` frontmatter. The desktop re-validates
 // this with the same allow-list (`validateClipEnvelope`), so this is the
 // cooperating producer half: a benign non-http(s) page clips WITHOUT provenance
-// instead of being rejected outright.
+// instead of being rejected outright. `safeHttpUrl` is the shared pure gate the
+// bookmark path (`background/bookmark`) uses too, so the two producers agree.
 function safeSourceUrl(): string {
-  try {
-    const u = new URL(document.location.href);
-    return u.protocol === "http:" || u.protocol === "https:" ? u.href : "";
-  } catch {
-    return "";
-  }
+  return safeHttpUrl(document.location.href);
 }
+
+// Recursion ceiling for the DOM walker. The extension runs in the adversary-
+// controlled page DOM, and a page can build arbitrarily deep nesting via scripted
+// `appendChild` (past the HTML parser's own nesting cap). Without a bound the
+// recursive walk would exhaust the JS call stack (`RangeError`) on such a hostile
+// page. Past this depth a subtree degrades to its `textContent` (safe — text
+// never executes markup). Real content nests far below this; 512 is generous.
+const MAX_WALK_DEPTH = 512;
 
 // Serialize ONE inline element to markdown, applying its own markup (link /
 // emphasis / code / image-alt) around its recursively-serialized inner. Nested
-// lists are deferred to the block walker; skip-tags vanish.
-function serializeInlineEl(el: Element): string {
+// lists are deferred to the block walker; skip-tags vanish. `guard` is the
+// structural recursion depth (NOT the list-indent depth) — the hostile-DOM
+// stack-overflow ceiling.
+function serializeInlineEl(el: Element, guard: number): string {
   const tag = el.tagName.toLowerCase();
   if (SKIP_TAGS.has(tag)) return "";
   if (tag === "br") return " ";
   if (tag === "ul" || tag === "ol") return ""; // a nested list is block-level
-  const inner = serializeInline(el);
+  // Depth ceiling: past the limit, degrade this subtree to plain text rather
+  // than recursing further into a scripted-deep tree.
+  if (guard > MAX_WALK_DEPTH) return el.textContent ?? "";
+  const inner = serializeInline(el, guard + 1);
   // Collapse only inside the branches that wrap the text (link / emphasis /
   // code); the common transparent-wrapper + img cases return `inner` raw, so
   // normalizing eagerly here would re-scan the same run at every nesting level
@@ -143,38 +146,45 @@ function serializeInlineEl(el: Element): string {
 }
 
 // Serialize a node's CHILDREN as one inline markdown run (text + inline markup).
-function serializeInline(node: Node): string {
+function serializeInline(node: Node, guard: number): string {
   let out = "";
   Array.from(node.childNodes).forEach((child) => {
     if (child.nodeType === Node.TEXT_NODE) {
       out += child.textContent ?? "";
     } else if (child.nodeType === Node.ELEMENT_NODE) {
-      out += serializeInlineEl(child as Element);
+      out += serializeInlineEl(child as Element, guard);
     }
   });
   return out;
 }
 
 // The collapsed inline line for a block element (heading / paragraph / list item).
-function inlineLine(el: Element): string {
-  return normalizeInline(serializeInline(el));
+function inlineLine(el: Element, guard: number): string {
+  return normalizeInline(serializeInline(el, guard));
 }
 
 // Emit one `<ul>`/`<ol>` as indented `- ` / `N.` lines, recursing into nested
 // lists with one more indent level. Each `<li>`'s own inline text excludes its
 // nested lists (those are emitted as their own deeper lines).
-function emitList(listEl: Element, out: string[], depth: number, ordered: boolean): void {
+function emitList(listEl: Element, out: string[], depth: number, ordered: boolean, guard: number): void {
+  // Depth ceiling: a scripted-deep nested list degrades to a single flattened
+  // bullet rather than recursing further.
+  if (guard > MAX_WALK_DEPTH) {
+    const text = normalizeInline(listEl.textContent ?? "");
+    if (text) out.push("  ".repeat(depth) + (ordered ? "1." : "-") + " " + text);
+    return;
+  }
   let index = 1;
   Array.from(listEl.children).forEach((child) => {
     if (child.tagName.toLowerCase() !== "li") return;
     const marker = ordered ? `${index++}.` : "-";
     const indent = "  ".repeat(depth);
-    const text = inlineLine(child); // serializeInline skips nested ul/ol
+    const text = inlineLine(child, guard + 1); // serializeInline skips nested ul/ol
     if (text) out.push(`${indent}${marker} ${text}`);
     Array.from(child.children).forEach((sub) => {
       const subTag = sub.tagName.toLowerCase();
       if (subTag === "ul" || subTag === "ol") {
-        emitList(sub, out, depth + 1, subTag === "ol");
+        emitList(sub, out, depth + 1, subTag === "ol", guard + 1);
       }
     });
   });
@@ -182,9 +192,9 @@ function emitList(listEl: Element, out: string[], depth: number, ordered: boolea
 
 // Emit a `<blockquote>` by walking its inner blocks into a sub-buffer and
 // prefixing every produced line with `> `.
-function emitBlockquote(el: Element, out: string[], depth: number): void {
+function emitBlockquote(el: Element, out: string[], depth: number, guard: number): void {
   const sub: string[] = [];
-  walkBlocks(el, sub, depth);
+  walkBlocks(el, sub, depth, guard + 1);
   const quoted = sub
     .map((line) => line.split("\n").map((l) => "> " + l).join("\n"))
     .join("\n>\n");
@@ -193,18 +203,18 @@ function emitBlockquote(el: Element, out: string[], depth: number): void {
 
 // Dispatch ONE block element to its markdown shape. Containers (div/section/…)
 // recurse so div-soup and semantic wrappers are walked rather than flattened.
-function emitElement(el: Element, out: string[], depth: number): void {
+function emitElement(el: Element, out: string[], depth: number, guard: number): void {
   const tag = el.tagName.toLowerCase();
   if (/^h[1-6]$/.test(tag)) {
-    const text = inlineLine(el);
+    const text = inlineLine(el, guard);
     if (text) out.push("#".repeat(Number(tag[1])) + " " + text);
   } else if (tag === "p") {
-    const text = inlineLine(el);
+    const text = inlineLine(el, guard);
     if (text) out.push(escapeLineStart(text));
   } else if (tag === "ul" || tag === "ol") {
-    emitList(el, out, depth, tag === "ol");
+    emitList(el, out, depth, tag === "ol", guard);
   } else if (tag === "blockquote") {
-    emitBlockquote(el, out, depth);
+    emitBlockquote(el, out, depth, guard);
   } else if (tag === "pre") {
     const code = (el.textContent ?? "").replace(/^\n+|\n+$/g, "");
     if (code.trim()) out.push("```\n" + code + "\n```");
@@ -212,12 +222,12 @@ function emitElement(el: Element, out: string[], depth: number): void {
     out.push("---");
   } else if (tag === "li") {
     // A stray `<li>` outside a list → a single bullet (defensive).
-    const text = inlineLine(el);
+    const text = inlineLine(el, guard);
     if (text) out.push("  ".repeat(depth) + "- " + text);
   } else {
     // div / section / article / main / figure / table / unknown → recurse so
     // nested blocks (and div-wrapped paragraphs) are walked, not dropped.
-    walkBlocks(el, out, depth);
+    walkBlocks(el, out, depth, guard + 1);
   }
 }
 
@@ -225,7 +235,14 @@ function emitElement(el: Element, out: string[], depth: number): void {
 // (text nodes + inline tags) is buffered into ONE paragraph and flushed when a
 // block boundary is hit — so a `<div>text <a>link</a> more</div>` becomes one
 // line with the link, instead of the innerText fragmenting it.
-function walkBlocks(root: Element, out: string[], depth: number): void {
+function walkBlocks(root: Element, out: string[], depth: number, guard: number): void {
+  // Depth ceiling (hostile-DOM guard): a scripted-deep container tree would blow
+  // the JS call stack; past the limit, flatten this subtree to its plain text.
+  if (guard > MAX_WALK_DEPTH) {
+    const text = normalizeInline(root.textContent ?? "");
+    if (text) out.push(escapeLineStart(text));
+    return;
+  }
   let inline = "";
   const flush = (): void => {
     const text = normalizeInline(inline);
@@ -242,10 +259,10 @@ function walkBlocks(root: Element, out: string[], depth: number): void {
     const tag = el.tagName.toLowerCase();
     if (SKIP_TAGS.has(tag)) return;
     if (INLINE_TAGS.has(tag)) {
-      inline += serializeInlineEl(el);
+      inline += serializeInlineEl(el, guard + 1);
     } else {
       flush();
-      emitElement(el, out, depth);
+      emitElement(el, out, depth, guard);
     }
   });
   flush();
@@ -269,9 +286,17 @@ function pickContentRoot(): Element {
 function captureArticle(): string {
   const root = pickContentRoot();
   const out: string[] = [];
-  walkBlocks(root, out, 0);
+  try {
+    walkBlocks(root, out, 0, 0);
+  } catch {
+    // A scripted-deep DOM that still overran the depth guard (or any unexpected
+    // walk error) must never fail the capture — discard the partial walk and
+    // fall through to the innerText path below.
+    out.length = 0;
+  }
   if (out.length === 0) {
-    // Fallback for an unusual DOM: the root's innerText split into paragraphs.
+    // Fallback for an unusual DOM (or an overflowed walk): the root's innerText
+    // split into paragraphs.
     const raw = ((root as HTMLElement).innerText ?? "").trim();
     for (const para of raw.split(/\n{2,}/)) {
       const p = normalizeInline(para);
@@ -291,7 +316,12 @@ function captureSelection(sel: Selection): string {
     wrap.appendChild(sel.getRangeAt(i).cloneContents());
   }
   const out: string[] = [];
-  walkBlocks(wrap, out, 0);
+  try {
+    walkBlocks(wrap, out, 0, 0);
+  } catch {
+    // Overflowed walk / unexpected DOM → fall back to the plain selection string.
+    out.length = 0;
+  }
   return out.join("\n\n") || normalizeInline(sel.toString());
 }
 

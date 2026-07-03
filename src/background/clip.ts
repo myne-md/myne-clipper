@@ -119,15 +119,21 @@ async function captureActiveTab(): Promise<CapturedClip | null> {
 const CLIP_REPLY_TIMEOUT_MS = 35_000;
 
 /**
- * The largest serialized envelope the extension will hand to the host (X1).
- * Chrome / Edge cap a SINGLE extension→host native message at 1 MiB; a larger
- * message is dropped by the browser runtime (the port errors / disconnects with
- * NO reply), which would otherwise surface as a misleading "open Myne" while
- * Myne is open and unlocked. We measure the serialized envelope up-front and
- * fail with an honest `clip_too_large` instead. The cap sits under 1 MiB to
- * leave headroom for the runtime's JSON + 4-byte-length framing overhead. (Note:
+ * The largest serialized envelope the extension will hand to the host (X1) — a
+ * deliberate EXTENSION-SIDE defense-in-depth cap, NOT a browser-imposed one.
+ *
+ * Chrome / Edge cap native messages at 1 MB in the HOST→EXT direction (the native
+ * host's reply back to the extension); the EXT→HOST direction — what we send here
+ * — is bounded far higher by the runtime (historically ~4 GB). So the runtime
+ * would NOT drop a >1 MiB clip for us; we cap it OURSELVES, well under the host
+ * contract's 64 MiB frame ceiling, so a pathological clip fails up-front with an
+ * honest `clip_too_large` instead of spawning the host for bytes it would reject.
+ * We measure the serialized envelope and keep the cap just under 1 MB. (Note:
  * `image_bytes` is currently a JSON number-array — ~4–7× inflation — so this cap
  * also bounds that until the wire encoding moves to base64.)
+ *
+ * Do NOT remove this on the assumption the runtime enforces it: this is the
+ * extension's FIRST line of defense; the host's 64 MiB frame cap is the second.
  */
 const MAX_EXT_TO_HOST_BYTES = 1_000_000;
 
@@ -147,9 +153,10 @@ export function sendEnvelopeToHost(
   captureKind: CaptureKind,
 ): Promise<ClipOutcome> {
   return new Promise<ClipOutcome>((resolve) => {
-    // Size guard (X1): a >1 MiB ext→host message is dropped by Chrome/Edge with
-    // no reply — measure the serialized envelope up-front and fail honestly,
-    // never spawning the host for a clip that can't traverse the wire.
+    // Size guard (X1): a deliberate ext-side defense-in-depth cap (the runtime
+    // does NOT drop ext→host at 1 MiB — that browser limit is the host→ext reply
+    // direction). Measure the serialized envelope up-front and fail honestly,
+    // never spawning the host for a clip that exceeds our ceiling.
     let serialized: string;
     try {
       serialized = JSON.stringify(envelope);

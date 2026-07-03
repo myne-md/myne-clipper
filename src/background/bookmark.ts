@@ -32,6 +32,8 @@
 // (the formal `capture_kind="bookmark"` degenerate-clip wire form) is formalized
 // in task 2; the default bridge already maps onto it, so task 2 refines only the
 // body composition, not this trigger.
+import { safeHttpUrl } from "../lib/markdown-safe";
+
 import type { CaptureKind, ClipOutcome } from "./clip";
 
 /**
@@ -100,13 +102,21 @@ export async function bookmarkActiveTab(
   options: BookmarkOptions,
 ): Promise<ClipOutcome> {
   const tab = await options.getActiveTab();
-  if (tab === null || typeof tab.url !== "string" || tab.url.length === 0) {
+  // Gate the tab URL to http(s) — the URL is the load-bearing field of a
+  // bookmark, and a non-http(s) tab (`file://` / `data:` / `about:` / `blob:` …)
+  // must NOT be emitted verbatim into the note. This mirrors the content-clip
+  // path's `safeSourceUrl` first-line guard (both share `safeHttpUrl`); a
+  // non-http(s) page is honestly un-bookmarkable rather than silently leaking a
+  // local path / inline blob across TB10 (the desktop re-validates too, but the
+  // two producer paths now apply the SAME first-line gate).
+  const url = tab && typeof tab.url === "string" ? safeHttpUrl(tab.url) : "";
+  if (tab === null || url === "") {
     return { status: "error", reason: "nothing_to_bookmark" };
   }
 
   const payload: BookmarkPayload = {
     captureKind: "bookmark",
-    sourceUrl: tab.url,
+    sourceUrl: url,
     // The URL is the load-bearing field; an absent title is fine (desktop-ingest
     // falls back). Never reach for a popup to ask for one (one gesture, instant).
     title: typeof tab.title === "string" ? tab.title : "",
