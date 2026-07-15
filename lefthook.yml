@@ -1,0 +1,88 @@
+# Lefthook config — myne-clipper (browser extension: TS + pnpm).
+# Install once per clone:  brew install lefthook && lefthook install
+# Skip ad-hoc:             LEFTHOOK=0 git commit ...   (or  git commit --no-verify)
+#
+# Mirrors the main `myne` repo's hook discipline (identical text-hygiene +
+# secret-scan blocks). Adds a project-specific guard on the manifest `key`,
+# which is cryptographically load-bearing: the Chromium extension ID is
+# DETERMINISTICALLY DERIVED from it and every clipper pairing token binds to
+# that ID (root CLAUDE.md, CHROMIUM_EXTENSION_ID). Fast hygiene on pre-commit;
+# typecheck + tests + bundle on pre-push.
+
+pre-commit:
+  parallel: true
+  commands:
+
+    tsc:
+      glob: "*.{ts,tsx}"
+      run: pnpm exec tsc --noEmit
+
+    manifest-key-guard:
+      # The committed `key` in src/manifest.json determines the Chromium
+      # extension ID (base64-decode -> SHA-256 -> first 16 bytes -> [a-p]); a
+      # change re-derives the ID and force-invalidates EVERY distributed
+      # pairing. Fail loudly if it drifts. If the change is intentional, commit
+      # with --no-verify AND update CHROMIUM_EXTENSION_ID in the main repo
+      # (src-tauri/src/clipper/manifest.rs).
+      run: |
+        git diff --cached --name-only | grep -qx 'src/manifest.json' || exit 0
+        old=$(git show HEAD:src/manifest.json 2>/dev/null | grep '"key"' || true)
+        new=$(git show :src/manifest.json | grep '"key"' || true)
+        if [ -n "$old" ] && [ "$old" != "$new" ]; then
+          echo "src/manifest.json 'key' changed — this re-derives the Chromium extension ID"
+          echo "and force-invalidates every distributed clipper pairing."
+          echo "If intentional: commit with --no-verify + update CHROMIUM_EXTENSION_ID in the main repo."
+          exit 1
+        fi
+
+    whitespace:
+      run: git diff --cached --check
+
+    eof-newline:
+      run: |
+        fail=0
+        for f in {staged_files}; do
+          [ -f "$f" ] || continue
+          if file --mime "$f" | grep -q 'charset=binary'; then continue; fi
+          if [ -n "$(tail -c1 "$f")" ]; then
+            echo "missing EOF newline: $f"
+            fail=1
+          fi
+        done
+        exit $fail
+
+    secret-scan:
+      run: |
+        fail=0
+        for f in {staged_files}; do
+          [ -f "$f" ] || continue
+          if file --mime "$f" | grep -q 'charset=binary'; then continue; fi
+          if grep -nE 'BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|aws_secret_access_key[[:space:]]*=' "$f" >/dev/null; then
+            echo "secret-like pattern in: $f"
+            grep -nE 'BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|aws_secret_access_key[[:space:]]*=' "$f"
+            fail=1
+          fi
+        done
+        exit $fail
+
+# Full validation battery — serial, runs before push.
+pre-push:
+  parallel: false
+  commands:
+    typecheck:
+      run: pnpm exec tsc --noEmit
+    vitest:
+      run: pnpm test
+    build:
+      run: pnpm build
+
+# Reject accidental AI co-author / attribution trailers in commit messages
+# (project policy). Lefthook passes the commit-message file path as {1}.
+commit-msg:
+  commands:
+    no-ai-coauthor:
+      run: |
+        if grep -qiE 'Co-Authored-By:.*(Claude|Anthropic)|Generated with .*Claude|🤖 Generated' "{1}"; then
+          echo "commit message carries an AI co-author/attribution trailer — remove it (project policy)."
+          exit 1
+        fi
