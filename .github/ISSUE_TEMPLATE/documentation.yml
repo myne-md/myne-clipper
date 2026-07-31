@@ -1,0 +1,21 @@
+name: Documentation
+description: The clipper README, install/pairing instructions, or a build doc is wrong or unclear.
+title: "[Docs]: "
+labels: [documentation]
+body:
+  - type: input
+    id: where
+    attributes:
+      label: Which document or page?
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Suggested fix

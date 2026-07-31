@@ -1,0 +1,92 @@
+name: Bug report
+description: The web clipper extension misbehaves — capture, pairing, or the desktop handoff.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The clipper is **keyless by design** — it never holds the vault key and cannot decrypt anything. All crypto happens in the desktop app.
+
+        - **Security issues do not go here.** Anything touching the pairing token, the native-messaging channel (TB10), or a way the extension could reach vault plaintext goes to **security@myne.md** privately — see [SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md).
+        - Bugs in the encryption or vault itself belong in the [main repo](https://github.com/myne-md/myne); the extension only hands a clip to the unlocked desktop.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Edge
+        - Firefox
+        - Other Chromium
+    validations:
+      required: true
+  - type: input
+    id: browser-version
+    attributes:
+      label: Browser version
+    validations:
+      required: true
+  - type: input
+    id: ext-version
+    attributes:
+      label: Extension version
+    validations:
+      required: true
+  - type: input
+    id: desktop-version
+    attributes:
+      label: Myne desktop version
+      description: The clipper hands off to the desktop app; its version matters for pairing/handoff bugs.
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "e.g. macOS 15.5, Windows 11, Arch Linux"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - Page capture (DOM to markdown)
+        - Pairing handshake
+        - Desktop handoff / native messaging
+        - URL bookmark path
+        - Toolbar / context menu / shortcuts
+        - Other
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console logs / screenshots
+      description: Extension background + page console. Redact anything sensitive; never paste a pairing token.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: This is not a security vulnerability (those go privately to security@myne.md), and I have not pasted a pairing token.
+          required: true

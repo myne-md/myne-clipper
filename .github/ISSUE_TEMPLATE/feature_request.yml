@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest an enhancement to the web clipper.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The extension stays **keyless and queue-less by design**: no vault key, no plaintext queue, no `<all_urls>` host permission, capture only on a user gesture. Proposals may not walk any of those back — see [`docs/threat-model.md`](https://github.com/myne-md/myne/blob/main/docs/threat-model.md) (TB10 / A14).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Which browser(s)?
+      multiple: true
+      options:
+        - Chrome
+        - Edge
+        - Firefox
+        - All
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: This keeps the extension keyless and queue-less, with no broad host permissions and no auto-injected capture.
+          required: true
