@@ -45,10 +45,19 @@ The six scenarios (root CLAUDE.md: a new user-facing flow ships WITH its E2E):
   (it reads "Couldn't clip — try again", or the rate-limit line); the toolbar icon
   returns to `idle` (never stuck in `clipping`).
 
-## 5. Two rapid clips → single toast (no stacking)
-- **Act:** click twice in quick succession.
-- **Assert:** only ONE `clip-toast` is present at any time (the second replaces
-  the first).
+## 5. Two rapid clips → single toast (no stacking), and ONE note
+- **Act:** click twice in quick succession, the second click landing while the
+  first handoff is still open.
+- **Assert:**
+  - only ONE `clip-toast` is present at any time (the second replaces the first);
+  - the vault gains exactly ONE note. The single-toast rule above is precisely
+    what would HIDE a duplicate, so the note count is the load-bearing half of
+    this scenario: the second gesture is dropped by the in-flight gate
+    (`background/toolbar.ts`) rather than deduped downstream — the handoff
+    envelope carries no request id and desktop ingest does not dedupe (SYNC-16
+    covers a deliberate re-clip, not one gesture counted twice).
+  - a LATER, deliberate second clip of the same page still writes its note
+    (the gate closes for the flight only, it never latches).
 
 ## 6. Reduced motion respected
 - **Pre:** `prefers-reduced-motion: reduce`.

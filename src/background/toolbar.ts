@@ -1,6 +1,8 @@
 // The toolbar-action handler core (clip-time-ux sub-feature 4, task 8).
 //
 // The browser-action click entrypoint that ties the slice together. It:
+//   0. drops the gesture outright if an earlier one is still in flight, so one
+//      gesture is one note (the in-flight gate below);
 //   1. reads the desktop vault state via the `is-unlocked-status` bridge FIRST
 //      (not a structure read — only unlocked/locked/closed/unpaired);
 //   2. branches:
@@ -20,10 +22,11 @@
 // to clip. A reject/timeout re-shows the pair prompt; a closed desktop shows the
 // open-Myne prompt. Nothing is captured until the vault is paired AND unlocked.
 //
-// Pure + dependency-injected: every side effect (status read, clip, icon, the
-// in-page toast/prompt) is a passed-in function, so the whole branch table is
-// unit-tested with no browser, no host, no DOM. The real wiring (`./index`)
-// supplies the live bridge + icon controller + tab messaging.
+// Dependency-injected: every side effect (status read, clip, icon, the in-page
+// toast/prompt) is a passed-in function, so the whole branch table is unit-tested
+// with no browser, no host, no DOM. The real wiring (`./index`) supplies the live
+// bridge + icon controller + tab messaging. The one piece of module state is the
+// in-flight gate below — a gesture counter, not a side effect.
 //
 // SYNC-15: the clip handoff carries `destination_folder` null + empty `tags`
 // (owned by the envelope builder); no folder/tag/structure ever crosses TB10
@@ -42,7 +45,10 @@ export type ToastVariant = "clip" | "bookmark";
 export type ToolbarOutcome =
   | { readonly kind: "clipped"; readonly variant: ToastVariant }
   | { readonly kind: "prompt"; readonly promptKind: PromptKind }
-  | { readonly kind: "error"; readonly reason: string };
+  | { readonly kind: "error"; readonly reason: string }
+  /** A gesture that arrived while a capture was already in flight, and was
+   *  dropped so the desktop writes ONE note per gesture (see the gate below). */
+  | { readonly kind: "dropped" };
 
 /** The icon transitions the handler drives (a subset of the controller). */
 export interface ToolbarIcon {
@@ -80,14 +86,52 @@ function variantFor(outcome: ClipOutcome & { status: "accepted" }): ToastVariant
   return outcome.captureKind === "bookmark" ? "bookmark" : "clip";
 }
 
+// ONE capture per gesture. The toolbar action, both clip context-menu entries,
+// the bookmark entry and the bookmark command are five independent triggers that
+// all land here, and this handler holds a window open for seconds: the status
+// round trip (with a possible cold host spawn), the bundle injection, the
+// capture, and a handoff bounded only by clip.ts's 35 s reply timeout. A second
+// gesture inside that window used to run a fully independent capture + handoff,
+// so the desktop wrote a SECOND note — and nothing downstream collapses them: the
+// handoff envelope carries no request id, and desktop ingest deliberately does
+// not dedupe (SYNC-16 ratifies "re-clip = no detection" for a user clipping the
+// same page twice ON PURPOSE; it does not cover one gesture counted twice). The
+// duplicate is silent, too, because the overlay shows one toast at a time — the
+// second replaces the first rather than stacking.
+//
+// The `clipping` icon state cannot serve as this gate, despite its own comment
+// naming it "do not click again". It is a DISPLAY state the locked branch and the
+// passive status poller also drive, and `locked -> clipping` / `saved ->
+// clipping` are illegal in the transition table — so gating on it would silently
+// swallow the click a user makes right after unlocking Myne, or within the 1.5 s
+// success window, which is a clip they are owed.
+let captureInFlight = false;
+
 /**
  * Handle one toolbar clip click. Reads vault state, then: `unpaired` → initiate
  * pairing then clip; `unlocked` → clip; `locked`/`closed` → the honest prompt
- * (capturing nothing). Returns the outcome for observability/testing. Never
- * throws on a bridge/host failure — a closed desktop or a flaky handoff degrades
- * to an honest prompt/error.
+ * (capturing nothing). A gesture arriving while an earlier one is still in flight
+ * is dropped (`kind: "dropped"`) — the in-flight "Saving to Myne…" banner is
+ * already the user's feedback. Returns the outcome for observability/testing.
+ * Never throws on a bridge/host failure — a closed desktop or a flaky handoff
+ * degrades to an honest prompt/error.
  */
 export async function handleClipClick(
+  deps: ToolbarHandlerDeps,
+): Promise<ToolbarOutcome> {
+  if (captureInFlight) return { kind: "dropped" };
+  captureInFlight = true;
+  try {
+    return await routeFromStatus(deps);
+  } finally {
+    // `finally`, not a tail assignment: a dep that throws must reopen the gate,
+    // or one bad handoff wedges every later gesture for the worker's lifetime.
+    captureInFlight = false;
+  }
+}
+
+/** The gated body: read vault state and take the matching branch. */
+async function routeFromStatus(
   deps: ToolbarHandlerDeps,
 ): Promise<ToolbarOutcome> {
   const status = await deps.queryStatus();

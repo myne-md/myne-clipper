@@ -26,6 +26,10 @@ function makeDeps(opts: {
   statusAfterPair?: VaultStatus;
   outcome?: ClipOutcome;
   pairOutcome?: PairOutcome;
+  /** Hold the handoff open until this settles, so gestures can overlap. */
+  holdClip?: Promise<void>;
+  /** Make the handoff throw, to prove the gate reopens on a thrown dep. */
+  clipThrows?: boolean;
 }): { deps: ToolbarHandlerDeps; rec: Recorded } {
   const rec: Recorded = {
     icon: [],
@@ -44,6 +48,8 @@ function makeDeps(opts: {
     },
     clip: async () => {
       rec.clipCalls += 1;
+      if (opts.clipThrows) throw new Error("host transport blew up");
+      if (opts.holdClip) await opts.holdClip;
       return opts.outcome ?? { status: "unreachable" };
     },
     icon: {
@@ -252,5 +258,80 @@ describe("handleClipClick — an unpaired click initiates pairing, then clips", 
     expect(rec.icon).toEqual(["lock"]);
     expect(rec.prompts).toEqual(["closed"]);
     expect(rec.clipCalls).toBe(0);
+  });
+});
+
+const ACCEPTED_CLIP: ClipOutcome = {
+  status: "accepted",
+  confirm: "ok",
+  captureKind: "full-article",
+};
+
+/** Flush pending microtasks so an in-flight gesture has really reached its held
+ *  handoff — a real second click lands mid-capture, not mid-status-read. */
+function settle(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+describe("handleClipClick — one gesture, one note (the in-flight gate)", () => {
+  it("drops a second gesture that lands mid-capture, so ONE note is written", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const clip = makeDeps({
+      status: "unlocked",
+      outcome: ACCEPTED_CLIP,
+      holdClip: held,
+    });
+    // A different trigger with a different capture function (the bookmark
+    // context-menu entry), so this also pins that the gate is shared across the
+    // five triggers rather than scoped per deps object.
+    const bookmark = makeDeps({
+      status: "unlocked",
+      outcome: { status: "accepted", confirm: "ok", captureKind: "bookmark" },
+    });
+
+    const first = handleClipClick(clip.deps);
+    await settle();
+    expect(clip.rec.clipCalls).toBe(1); // the first gesture is inside its handoff
+
+    const second = await handleClipClick(bookmark.deps);
+    expect(second).toEqual({ kind: "dropped" });
+    expect(bookmark.rec.clipCalls).toBe(0); // no second capture → no duplicate note
+    expect(bookmark.rec.progress).toEqual([]); // dropped at the door, not mid-flow
+    expect(bookmark.rec.toasts).toEqual([]); // and no second toast to hide it
+
+    release();
+    expect(await first).toEqual({ kind: "clipped", variant: "clip" });
+    expect(clip.rec.clipCalls).toBe(1); // still exactly one capture
+  });
+
+  it("reopens the gate once the capture lands (a deliberate re-clip still clips)", async () => {
+    const before = makeDeps({ status: "unlocked", outcome: ACCEPTED_CLIP });
+    await handleClipClick(before.deps);
+
+    // SYNC-16: clipping the same page again ON PURPOSE is a supported gesture —
+    // the gate must close for the flight only, never latch.
+    const after = makeDeps({ status: "unlocked", outcome: ACCEPTED_CLIP });
+    expect(await handleClipClick(after.deps)).toEqual({
+      kind: "clipped",
+      variant: "clip",
+    });
+    expect(after.rec.clipCalls).toBe(1);
+  });
+
+  it("reopens the gate when the handoff throws (one bad clip never wedges it)", async () => {
+    const throwing = makeDeps({ status: "unlocked", clipThrows: true });
+    await expect(handleClipClick(throwing.deps)).rejects.toThrow(
+      "host transport blew up",
+    );
+
+    const after = makeDeps({ status: "unlocked", outcome: ACCEPTED_CLIP });
+    expect(await handleClipClick(after.deps)).toEqual({
+      kind: "clipped",
+      variant: "clip",
+    });
+    expect(after.rec.clipCalls).toBe(1);
   });
 });
