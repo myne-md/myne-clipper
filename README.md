@@ -23,11 +23,11 @@ What exists in this repo today:
 - The in-page DOM→markdown capture, hand-rolled and zero-dependency: `src/content/capture.ts`.
 - The URL bookmark path: `src/background/{bookmark,bookmark-adapter}.ts`.
 - The toolbar / context-menu / keyboard-command triggers and the in-page toast + prompt content UI: `src/{background/toolbar.ts,content/}`.
-- 24 Vitest unit suites under `tests/`.
+- Vitest unit suites under `tests/`.
 
 What is **not** here yet:
 
-- A published / signed store build (the manifest still carries a dev `key` and `version: 0.0.0`).
+- A published / signed store build. The version is bumped each release (`0.10.0` today), but the extension is dev-loaded as an unpacked zip rather than listed in a store, and the manifest's dev `key` and both extension IDs are kept unchanged, because changing either forces a re-pair of every clipper.
 - Runnable E2E. `e2e/clip-time-ux.scenarios.md` is **authored, not yet runnable** — it waits on the cross-process tauri-driver native-messaging harness, which lives desktop-side. The surface contract those scenarios depend on is pinned today by `tests/notice-contract.test.ts`.
 - Branded icons (`src/icons/` ships placeholder marks).
 
