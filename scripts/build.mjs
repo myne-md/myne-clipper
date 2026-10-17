@@ -66,4 +66,13 @@ cpSync("src/icons", "dist/icons", { recursive: true });
 // it without re-declaring the token values.
 cpSync("src/lib/tokens.css", "dist/tokens.css");
 
-console.log("build: dist/ ready (manifest + background + content + popup + icons)");
+// Third-party notices. Two files, and the split is the point: `NOTICE` is the
+// index a human reads, and the upstream licence text is COPIED from the
+// installed package rather than transcribed into the index, so what ships is
+// the licence of the version actually inlined by the bundle above. A
+// hand-copied licence is the copy that goes stale on a dependency bump, and
+// nothing here would notice.
+cpSync("NOTICE", "dist/NOTICE");
+cpSync("node_modules/webextension-polyfill/LICENSE", "dist/LICENSE.webextension-polyfill.txt");
+
+console.log("build: dist/ ready (manifest + background + content + popup + icons + notices)");
