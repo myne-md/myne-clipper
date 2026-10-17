@@ -9,7 +9,7 @@
 > `tests/notice-contract.test.ts`; the surface BEHAVIORS are covered by the
 > task 6/7/8/11/12 controller + handler unit tests.
 
-The six scenarios (root CLAUDE.md: a new user-facing flow ships WITH its E2E):
+The six scenarios (root AGENTS.md: a new user-facing flow ships WITH its E2E):
 
 ## 1. Paired + unlocked toolbar click → clip success
 - **Pre:** desktop unlocked, extension paired.

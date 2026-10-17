@@ -6,7 +6,7 @@
 # secret-scan blocks). Adds a project-specific guard on the manifest `key`,
 # which is cryptographically load-bearing: the Chromium extension ID is
 # DETERMINISTICALLY DERIVED from it and every clipper pairing token binds to
-# that ID (root CLAUDE.md, CHROMIUM_EXTENSION_ID). Fast hygiene on pre-commit;
+# that ID (root AGENTS.md, CHROMIUM_EXTENSION_ID). Fast hygiene on pre-commit;
 # typecheck + tests + bundle on pre-push.
 
 # Pinned to the version this hook battery was actually verified against, not to

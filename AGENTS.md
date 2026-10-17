@@ -1,6 +1,6 @@
 # myne-clipper/ — Myne browser extension (keyless web clipper)
 
-> Companion repository to [`myne`](https://github.com/myne-md/myne), cloned next to it via `workspace/setup.sh` (listed in the main repo's `workspace/manifest.txt`). A **separate repo with its own supply chain** — see "Supply chain" below. License: **AGPL-3.0**. Loaded when Claude reads files here.
+> Companion repository to [`myne`](https://github.com/myne-md/myne), cloned next to it via `workspace/setup.sh` (listed in the main repo's `workspace/manifest.txt`). A **separate repo with its own supply chain** — see "Supply chain" below. License: **AGPL-3.0**. Loaded when OpenCode reads files here.
 
 The Manifest V3 browser extension that clips the page you are reading into your encrypted Myne vault. Chrome + Edge + Firefox from one codebase (MV3, `webextension-polyfill`); **Safari is out of v1 scope** (localhost-bridge fallback deferred, SYNC-6 / SYNC-28).
 
