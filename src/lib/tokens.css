@@ -50,7 +50,7 @@
 
   /* -- State ----------------------------------------------------------- */
   --success: #2f6048; /* the saved-chip / circle-check tint */
-  --danger: #b54034; /* the error-toast / circle-alert tint */
+  --danger: #8a2a23; /* the error-toast / circle-alert tint — the canon's `--danger`, not a clipper tint */
 
   /* -- Elevation ------------------------------------------------------- */
   --shadow-2: 0 2px 4px rgba(11, 11, 9, 0.06), 0 4px 12px rgba(11, 11, 9, 0.08);
@@ -79,7 +79,7 @@
   --line-1: #2c2b28; /* --_line-1-dark */
   --accent: #8aa4d0; /* --_accent-dark */
   --success: #8cc1a4; /* --_success-dark */
-  --danger: #d98b80; /* --_danger-dark */
+  --danger: #d99086; /* --_danger-dark */
   --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.5);
   color: #e8e7df; /* --_ink-1-dark */
 }
@@ -93,7 +93,7 @@
     --line-1: #2c2b28; /* --_line-1-dark */
     --accent: #8aa4d0; /* --_accent-dark */
     --success: #8cc1a4; /* --_success-dark */
-    --danger: #d98b80; /* --_danger-dark */
+    --danger: #d99086; /* --_danger-dark */
     --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.5);
     color: #e8e7df; /* --_ink-1-dark */
   }

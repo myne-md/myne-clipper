@@ -53,5 +53,5 @@ export const STATE_INK: Record<IconState, string> = {
   idle: "#1f2933", // neutral toolbar ink (resting)
   clipping: "#1f2933", // neutral toolbar ink (in-flight; the "…" badge carries the motion read)
   saved: "#2f6048", // --success (light) — the saved-chip green
-  locked: "#b54034", // alert red — distinct from success; lock glyph + "!" badge are the real reads
+  locked: "#8a2a23", // --danger (light) — the alert red, distinct from success; lock glyph + "!" badge are the real reads
 } as const;
