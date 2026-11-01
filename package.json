@@ -1,6 +1,6 @@
 {
   "name": "myne-clipper",
-  "version": "0.11.3",
+  "version": "0.11.4",
   "private": true,
   "description": "Myne Clipper — keyless web clipper for Chrome, Edge, and Firefox (MV3).",
   "license": "AGPL-3.0",
