@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Myne Clipper",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAshA6zNpr6RyD7WtxsUPC15Xb/0f4RnPCn6uVXqAWqLmugQhc2NLws9P2SFvfCu6m7fIkoT1YNIWz8NTp/7GQF4n3b9f+vYF47IlCihDg/Y1+6v1NJxu5mdHiXhvFvHLjwFizg7oVpRn6yBHlqVLFgTsNpTE6bvoMydjg2kt0Bi/6S9obCkO8a2uDZFMYuW6z/7655brdemV3LTAeHQXmzWtC6fqD1vyHcAwUyfy/1Dgp223w2x8Wo/2z7Xkigbj5EMYykiNK6Rri0+Sb0K7SCkUAZbKkre3csd910o4ZJYWhAqXc7hNJwOaoOBa1TOboicA7yDlt+1OxS/Cd3RNt+wIDAQAB",
   "description": "Keyless web clipper for Myne — clips the page you are reading into your encrypted Myne vault.",
   "icons": {
