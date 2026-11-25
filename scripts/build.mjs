@@ -73,6 +73,7 @@ cpSync("src/lib/tokens.css", "dist/tokens.css");
 // hand-copied licence is the copy that goes stale on a dependency bump, and
 // nothing here would notice.
 cpSync("NOTICE", "dist/NOTICE");
+cpSync("LICENSE", "dist/LICENSE");
 cpSync("node_modules/webextension-polyfill/LICENSE", "dist/LICENSE.webextension-polyfill.txt");
 
 console.log("build: dist/ ready (manifest + background + content + popup + icons + notices)");
