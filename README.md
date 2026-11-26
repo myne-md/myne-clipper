@@ -27,7 +27,7 @@ What exists in this repo today:
 
 What is **not** here yet:
 
-- A published / signed store build. The version is bumped each release (`0.11.0` today), but the extension is dev-loaded as an unpacked zip rather than listed in a store, and the manifest's dev `key` and both extension IDs are kept unchanged, because changing either forces a re-pair of every clipper.
+- A published / signed store build. The extension is built from source and loaded unpacked; there is no store listing, no published binary, and no release artifact. The manifest's dev `key` and both extension IDs are kept unchanged, because changing either forces a re-pair of every clipper.
 - Runnable E2E. `e2e/clip-time-ux.scenarios.md` is **authored, not yet runnable** — it waits on the cross-process tauri-driver native-messaging harness, which lives desktop-side. The surface contract those scenarios depend on is pinned today by `tests/notice-contract.test.ts`.
 - Branded icons (`src/icons/` ships placeholder marks).
 
@@ -86,4 +86,4 @@ pnpm test         # vitest run
 
 ## License
 
-Application code in this repo is **AGPL-3.0** (declared in `package.json`), matching the Myne project's license for client code. The project's specs in the main repo's `docs/` keep a permissive content license (CC-BY-4.0) so the protocol stays reusable for independent implementations.
+Application code in this repo is **AGPL-3.0-only** (declared in `package.json`), matching the Myne project's license for client code. The project's specs in the main repo's `docs/` keep a permissive content license (CC-BY-4.0) so the protocol stays reusable for independent implementations.

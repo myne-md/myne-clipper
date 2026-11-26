@@ -1,0 +1,43 @@
+name: validate
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25.9.0
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.8.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build the extension bundle
+        run: pnpm build
+
+      - name: Verify the bundle is loadable
+        run: |
+          set -eu
+          test -f dist/manifest.json
+          test -f dist/background.js
+          test -f dist/content.js
+          test -f dist/popup.js
+          node -e "const m=require('./dist/manifest.json'); if (!m.manifest_version || !m.background) process.exit(1); console.log('manifest', m.manifest_version, m.version)"

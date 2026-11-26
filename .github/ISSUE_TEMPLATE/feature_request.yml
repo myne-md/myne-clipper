@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        The extension stays **keyless and queue-less by design**: no vault key, no plaintext queue, no `<all_urls>` host permission, capture only on a user gesture. Proposals may not walk any of those back — see [`docs/threat-model.md`](https://github.com/myne-md/myne/blob/main/docs/threat-model.md) (TB10 / A14).
+        The extension stays **keyless and queue-less by design**: no vault key, no plaintext queue, no `<all_urls>` host permission, capture only on a user gesture. Proposals may not walk any of those back — see [`docs/threat-model.md`](https://github.com/myne-md/myne/blob/develop/docs/threat-model.md) (TB10 / A14).
   - type: textarea
     id: problem
     attributes:

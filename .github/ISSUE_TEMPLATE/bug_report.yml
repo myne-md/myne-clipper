@@ -8,7 +8,7 @@ body:
       value: |
         The clipper is **keyless by design** — it never holds the vault key and cannot decrypt anything. All crypto happens in the desktop app.
 
-        - **Security issues do not go here.** Anything touching the pairing token, the native-messaging channel (TB10), or a way the extension could reach vault plaintext goes to **security@myne.md** privately — see [SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md).
+        - **Security issues do not go here.** Anything touching the pairing token, the native-messaging channel (TB10), or a way the extension could reach vault plaintext goes to **security@myne.md** privately — see [SECURITY.md](https://github.com/myne-md/myne/blob/develop/SECURITY.md).
         - Bugs in the encryption or vault itself belong in the [main repo](https://github.com/myne-md/myne); the extension only hands a clip to the unlocked desktop.
   - type: textarea
     id: what-happened
