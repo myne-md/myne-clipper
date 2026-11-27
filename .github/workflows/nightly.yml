@@ -1,8 +1,11 @@
 name: nightly
 
-# Unsigned extension build: no release, no store upload. Mirrors the main
-# repository's nightly-build contract, which keeps the team on the current
-# develop without turning a nightly into an official artefact.
+# Unsigned extension build: no release and no store upload. The Actions
+# artifact is transport, not distribution: the status box's nightly mirror
+# pulls it and publishes it under https://downloads.myne.md/nightly/; CI never
+# uploads to the server directly. The artifact references the main repository's
+# nightly-build contract, which keeps the team on the current develop without
+# turning a nightly into an official artefact.
 
 on:
   schedule:
